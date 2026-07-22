@@ -1,0 +1,16 @@
+"visit_date","visitors_count","utm_source","utm_medium","utm_campaign","total_cost","leads_count","purchases_count","revenue"
+"2023-06-01",1,Yandex,cpc,"03997128",0,0,0,0
+"2023-06-01",1,Yandex,cpm,"01097402",0,0,0,0
+"2023-06-01",66,admitad,cpa,admitad,0,0,0,0
+"2023-06-01",3,google,cpc,frontend,0,0,0,0
+"2023-06-01",5,telegram,cpp,base-frontend,0,0,0,0
+"2023-06-01",33,telegram,cpp,base-java,0,0,0,0
+"2023-06-01",38,telegram,cpp,base-python,0,0,0,0
+"2023-06-01",2,telegram,cpp,dod-java,0,0,0,0
+"2023-06-01",3,telegram,cpp,dod-php,0,0,0,0
+"2023-06-01",1,telegram,cpp,intensive-python,0,0,0,0
+"2023-06-01",1,telegram,cpp,prof-php,0,0,0,0
+"2023-06-01",1,telegram,cpp,prof-python,0,1,0,0
+"2023-06-01",3,telegram,social,course_completed,0,0,0,0
+"2023-06-01",1,telegram,social,mdtrue*studenty-mnogih-onlayn-kursov-p,0,0,0,0
+"2023-06-01",11,tproger,cpc,dod-frontend,0,0,0,0
