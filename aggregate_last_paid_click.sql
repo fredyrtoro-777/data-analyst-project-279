@@ -52,14 +52,14 @@ marketing_costs AS (
     ) ads
     GROUP BY campaign_date, utm_source, utm_medium, utm_campaign
 )
--- 5. Unión e integración final respetando el ordenamiento explícito del enunciado
+-- 5. Unión e integración final con formato de fecha estricto YYYY-MM-DD
 SELECT 
-    COALESCE(sm.visit_date, mc.visit_date) AS visit_date,
+    TO_CHAR(COALESCE(sm.visit_date, mc.visit_date), 'YYYY-MM-DD') AS visit_date, -- Fuerza el formato limpio de fecha
     COALESCE(sm.visitors_count, 0) AS visitors_count,
     COALESCE(sm.utm_source, mc.utm_source) AS utm_source,
     COALESCE(sm.utm_medium, mc.utm_medium) AS utm_medium,
     COALESCE(sm.utm_campaign, mc.utm_campaign) AS utm_campaign,
-    CAST(mc.total_cost AS INTEGER) AS total_cost, -- Mantiene vacíos/nulls si no hay costo en lugar de forzar ceros
+    CAST(mc.total_cost AS INTEGER) AS total_cost,
     COALESCE(sm.leads_count, 0) AS leads_count,
     COALESCE(sm.purchases_count, 0) AS purchases_count,
     sm.revenue
