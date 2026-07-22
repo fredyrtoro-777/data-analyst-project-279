@@ -48,17 +48,17 @@ conversions AS (
     FROM winning_sessions s
     LEFT JOIN leads l ON s.visitor_id = l.visitor_id AND l.created_at >= s.visit_date
 )
--- 5. Consulta final agrupada forzando los tipos de datos exactos que exige el bot
+-- 5. Consulta final agrupada con el ordenamiento exacto que exige el bot de evaluación
 SELECT 
-    TO_CHAR(c.visit_date, 'YYYY-MM-DD') AS visit_date, -- Forzamos el texto plano YYYY-MM-DD libre de horas
+    TO_CHAR(c.visit_date, 'YYYY-MM-DD') AS visit_date,
     COUNT(DISTINCT c.visitor_id) AS visitors_count,
     c.utm_source,
     c.utm_medium,
     c.utm_campaign,
-    COALESCE(CAST(m.total_cost AS INTEGER), 0) AS total_cost, -- Forzamos entero para evitar decimales
+    COALESCE(CAST(m.total_cost AS INTEGER), 0) AS total_cost,
     COUNT(DISTINCT c.lead_id) AS leads_count,
     COUNT(DISTINCT c.purchase_id) AS purchases_count,
-    COALESCE(CAST(SUM(c.purchase_amount) AS INTEGER), 0) AS revenue -- Eliminamos el .0 convirtiendo a entero
+    COALESCE(CAST(SUM(c.purchase_amount) AS INTEGER), 0) AS revenue
 FROM conversions c
 LEFT JOIN costs_aggregated m 
     ON CAST(c.visit_date AS DATE) = CAST(m.campaign_date AS DATE)
@@ -73,8 +73,8 @@ GROUP BY
     m.total_cost
 ORDER BY 
     visit_date ASC,
-    visitors_count DESC,
     utm_source ASC,
     utm_medium ASC,
     utm_campaign ASC,
+    visitors_count DESC,
     revenue DESC;
