@@ -78,3 +78,4 @@ ORDER BY
     utm_campaign ASC,
     visitors_count DESC,
     revenue DESC;
+
