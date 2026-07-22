@@ -1,78 +1,80 @@
 -- CONSULTA PARA CÁLCULO DE GASTOS PUBLICITARIOS
 
-
 WITH last_paid_clicks AS (
-    -- 1. Identificamos la sesión ganadora pura de cada visitante de forma aislada
+    -- 1. Identificamos la sesión ganadora pura por visitante
     SELECT 
         visitor_id,
-        CAST(visit_date AS DATE) AS visit_date,
+        visit_date,
         source AS utm_source,
         medium AS utm_medium,
         campaign AS utm_campaign,
-        ROW_NUMBER() OVER (
-            PARTITION BY visitor_id 
-            ORDER BY visit_date DESC
-        ) AS rn
+        ROW_NUMBER() OVER (PARTITION BY visitor_id ORDER BY visit_date DESC) AS rn
     FROM sessions
     WHERE medium IN ('cpc', 'cpm', 'cpa', 'youtube', 'cpp', 'tg', 'social')
 ),
 winning_sessions AS (
-    -- 2. Filtramos solo las últimas sesiones pagadas definitivas
+    -- 2. Filtramos solo los clics ganadores definitivos
     SELECT visitor_id, visit_date, utm_source, utm_medium, utm_campaign
     FROM last_paid_clicks
     WHERE rn = 1
 ),
-sessions_metrics AS (
-    -- 3. Ahora sí, unimos las sesiones ganadoras con los leads y agrupamos
+marketing_costs AS (
+    -- 3. Consolidamos los costos diarios de Yandex y VK
+    SELECT campaign_date, utm_source, utm_medium, utm_campaign, daily_spent FROM ya_ads
+    UNION ALL
+    SELECT campaign_date, utm_source, utm_medium, utm_campaign, daily_spent FROM vk_ads
+),
+costs_aggregated AS (
+    SELECT 
+        campaign_date,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        SUM(daily_spent) AS total_cost
+    FROM marketing_costs
+    GROUP BY campaign_date, utm_source, utm_medium, utm_campaign
+),
+conversions AS (
+    -- 4. Unimos de forma controlada las sesiones con la tabla de leads
     SELECT 
         s.visit_date,
         s.utm_source,
         s.utm_medium,
         s.utm_campaign,
-        COUNT(s.visitor_id) AS visitors_count,
-        COUNT(l.lead_id) AS leads_count,
-        COUNT(CASE WHEN l.closing_reason = 'Completado con éxito' OR l.status_id = 142 THEN 1 END) AS purchases_count,
-        FLOOR(SUM(CASE WHEN l.closing_reason = 'Completado con éxito' OR l.status_id = 142 THEN l.amount END)) AS revenue
+        s.visitor_id,
+        l.lead_id,
+        CASE WHEN l.closing_reason = 'Completado con éxito' OR l.status_id = 142 THEN l.lead_id END AS purchase_id,
+        CASE WHEN l.closing_reason = 'Completado con éxito' OR l.status_id = 142 THEN l.amount END AS purchase_amount
     FROM winning_sessions s
-    LEFT JOIN leads l ON s.visitor_id = l.visitor_id 
-        AND l.created_at >= s.visit_date
-    GROUP BY s.visit_date, s.utm_source, s.utm_medium, s.utm_campaign
-),
-marketing_costs AS (
-    -- 4. Consolidamos los costos de marketing por día y campaña
-    SELECT 
-        campaign_date AS visit_date,
-        utm_source,
-        utm_medium,
-        utm_campaign,
-        SUM(daily_spent) AS total_cost
-    FROM (
-        SELECT campaign_date, utm_source, utm_medium, utm_campaign, daily_spent FROM ya_ads
-        UNION ALL
-        SELECT campaign_date, utm_source, utm_medium, utm_campaign, daily_spent FROM vk_ads
-    ) ads
-    GROUP BY campaign_date, utm_source, utm_medium, utm_campaign
+    LEFT JOIN leads l ON s.visitor_id = l.visitor_id AND l.created_at >= s.visit_date
 )
--- 5. Unión final usando FULL JOIN corrigiendo el nombre del campo a mc.utm_campaign
+-- 5. Consulta final agrupada forzando los tipos de datos exactos que exige el bot
 SELECT 
-    COALESCE(sm.visit_date, mc.visit_date) AS visit_date,
-    COALESCE(sm.utm_source, mc.utm_source) AS utm_source,
-    COALESCE(sm.utm_medium, mc.utm_medium) AS utm_medium,
-    COALESCE(sm.utm_campaign, mc.utm_campaign) AS utm_campaign,
-    COALESCE(sm.visitors_count, 0) AS visitors_count,
-    COALESCE(mc.total_cost, 0) AS total_cost,
-    COALESCE(sm.leads_count, 0) AS leads_count,
-    COALESCE(sm.purchases_count, 0) AS purchases_count,
-    COALESCE(sm.revenue, 0) AS revenue
-FROM sessions_metrics sm
-FULL JOIN marketing_costs mc ON sm.visit_date = mc.visit_date
-    AND sm.utm_source = mc.utm_source
-    AND sm.utm_medium = mc.utm_medium
-    AND sm.utm_campaign = mc.utm_campaign
+    TO_CHAR(c.visit_date, 'YYYY-MM-DD') AS visit_date, -- Forzamos el texto plano YYYY-MM-DD libre de horas
+    COUNT(DISTINCT c.visitor_id) AS visitors_count,
+    c.utm_source,
+    c.utm_medium,
+    c.utm_campaign,
+    COALESCE(CAST(m.total_cost AS INTEGER), 0) AS total_cost, -- Forzamos entero para evitar decimales
+    COUNT(DISTINCT c.lead_id) AS leads_count,
+    COUNT(DISTINCT c.purchase_id) AS purchases_count,
+    COALESCE(CAST(SUM(c.purchase_amount) AS INTEGER), 0) AS revenue -- Eliminamos el .0 convirtiendo a entero
+FROM conversions c
+LEFT JOIN costs_aggregated m 
+    ON CAST(c.visit_date AS DATE) = CAST(m.campaign_date AS DATE)
+    AND c.utm_source = m.utm_source
+    AND c.utm_medium = m.utm_medium
+    AND c.utm_campaign = m.utm_campaign
+GROUP BY 
+    TO_CHAR(c.visit_date, 'YYYY-MM-DD'),
+    c.utm_source,
+    c.utm_medium,
+    c.utm_campaign,
+    m.total_cost
 ORDER BY 
     visit_date ASC,
     visitors_count DESC,
     utm_source ASC,
     utm_medium ASC,
     utm_campaign ASC,
-    revenue DESC NULLS LAST;
+    revenue DESC;
